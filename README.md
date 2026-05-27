@@ -24,6 +24,7 @@ A collection of utility PowerShell scripts for Active Directory administration a
 | [`get-group-nesting-audit.ps1`](#get-group-nesting-auditps1) | Audit the full nesting tree of one or more AD groups |
 | [`compare-aduser-group-memberships.ps1`](#compare-aduser-group-membershipsps1) | Compare group memberships across all members of an AD group to surface outliers |
 | [`get-ad-ou-delegation-audit.ps1`](#get-ad-ou-delegation-auditps1) | Export custom/non-default OU delegations across an entire domain or OU subtree |
+| [`compare-adgroup-members.ps1`](#compare-adgroup-membersps1) | Compare membership of two AD groups side by side, identifying shared and unique members |
 
 ---
 
@@ -197,3 +198,41 @@ Exports custom, non-default ACE delegations on AD Organisational Units — filte
 Output is saved as a CSV in the current directory, e.g.:
 - `OUDelegationAudit_FullDomain_20250515_143022.csv`
 - `OUDelegationAudit_Helpdesk_20250515_143022.csv`
+
+---
+
+### `compare-adgroup-members.ps1`
+
+Compares the membership of two AD groups side by side, showing which users appear in both, which are unique to each group, and a full breakdown in both the console and a CSV export.
+
+**Features**
+- Resolves both groups recursively so nested members are included
+- Colour-coded console output: yellow (only in group 1), magenta (only in group 2), green (in both)
+- Status column in CSV makes it easy to filter in Excel
+- Includes UPN and email address alongside display name for easier identification
+
+**Usage**
+
+```powershell
+# Interactive mode (prompts for both group names)
+.\compare-adgroup-members.ps1
+
+# With parameters
+.\compare-adgroup-members.ps1 -Group1 "Sales-Team" -Group2 "Marketing-Team"
+
+# With a custom output path
+.\compare-adgroup-members.ps1 -Group1 "Sales-Team" -Group2 "Marketing-Team" -OutputPath "C:\Audit\comparison.csv"
+```
+
+**Output columns**
+
+| Column | Description |
+|---|---|
+| `Username` | SamAccountName of the user |
+| `DisplayName` | Display name of the user |
+| `UPN` | User Principal Name |
+| `Email` | Email address from AD |
+| `Status` | `In Both`, `Only in <Group1>`, or `Only in <Group2>` |
+
+Output is saved as a CSV in the current directory, e.g.:
+- `GroupComparison_Sales-Team_vs_Marketing-Team_20250515_143022.csv`
