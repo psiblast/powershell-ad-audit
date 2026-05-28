@@ -25,6 +25,7 @@ A collection of utility PowerShell scripts for Active Directory administration a
 | [`compare-aduser-group-memberships.ps1`](#compare-aduser-group-membershipsps1) | Compare group memberships across all members of an AD group to surface outliers |
 | [`get-ad-ou-delegation-audit.ps1`](#get-ad-ou-delegation-auditps1) | Export custom/non-default OU delegations across an entire domain or OU subtree |
 | [`compare-adgroup-members.ps1`](#compare-adgroup-membersps1) | Compare membership of two AD groups side by side, identifying shared and unique members |
+| [`find-duplicate-nested-memberships.ps1`](#find-duplicate-nested-membershipsps1) | Find users who reach the same group via more than one nested membership path |
 
 ---
 
@@ -236,3 +237,46 @@ Compares the membership of two AD groups side by side, showing which users appea
 
 Output is saved as a CSV in the current directory, e.g.:
 - `GroupComparison_Sales-Team_vs_Marketing-Team_20250515_143022.csv`
+
+---
+
+### `find-duplicate-nested-memberships.ps1`
+
+Identifies users who reach the same group via more than one direct membership source — for example, a user in both `Team-A` and `Team-B` where both groups are nested inside `App-Access`, giving them two separate routes to the same effective permission. Useful for cleaning up redundant access paths and simplifying group structures.
+
+**Features**
+- Works against a single user or all users within a group
+- For each user, walks every direct membership upward recursively and maps which ancestor groups are reachable from multiple sources
+- Console output sorted by source count — entries with 4 or more sources flagged in red for investigation
+- Verbose mode (single user) shows all findings per user; group mode summarises only affected users
+
+**Usage**
+
+```powershell
+# Interactive mode (prompts for identity and type)
+.\find-duplicate-nested-memberships.ps1
+
+# Single user
+.\find-duplicate-nested-memberships.ps1 -Identity "jsmith" -Type User
+
+# All members of a group
+.\find-duplicate-nested-memberships.ps1 -Identity "Helpdesk" -Type Group
+
+# With a custom output path
+.\find-duplicate-nested-memberships.ps1 -Identity "Helpdesk" -Type Group -OutputPath "C:\Audit\duplicates.csv"
+```
+
+**Output columns**
+
+| Column | Description |
+|---|---|
+| `Username` | SamAccountName of the user |
+| `DisplayName` | Display name of the user |
+| `UPN` | User Principal Name |
+| `DuplicateGroup` | The group reachable via multiple paths |
+| `SourceCount` | Number of distinct direct memberships leading to that group |
+| `Sources` | Pipe-separated list of the direct groups that each provide a route |
+
+Output is saved as a CSV in the current directory, e.g.:
+- `DuplicateMemberships_jsmith_20250515_143022.csv`
+- `DuplicateMemberships_Helpdesk_20250515_143022.csv`
