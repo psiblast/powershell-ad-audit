@@ -26,6 +26,7 @@ A collection of utility PowerShell scripts for Active Directory administration a
 | [`get-ad-ou-delegation-audit.ps1`](#get-ad-ou-delegation-auditps1) | Export custom/non-default OU delegations across an entire domain or OU subtree |
 | [`compare-adgroup-members.ps1`](#compare-adgroup-membersps1) | Compare membership of two AD groups side by side, identifying shared and unique members |
 | [`find-duplicate-nested-memberships.ps1`](#find-duplicate-nested-membershipsps1) | Find users who reach the same group via more than one nested membership path |
+| [`find-groups-with-no-nesting-purpose.ps1`](#find-groups-with-no-nesting-purposeps1) | Identify AD groups that play no role in any group nesting structure |
 
 ---
 
@@ -121,7 +122,7 @@ Compares group memberships across all members of an AD group, identifying which 
 - Resolves full recursive group memberships for every user in the target group
 - Classifies each membership as `Common` (shared by all) or `Unique to this user`
 - Console summary ranked by unique membership count — largest outliers flagged in red
-- Colour-coded output: grey (0 unique), white (1–10), yellow (11–30), red (31+, flagged for investigation)
+- Colour-coded output: grey (0 unique), white (1-10), yellow (11-30), red (31+, flagged for investigation)
 
 **Usage**
 
@@ -280,3 +281,68 @@ Identifies users who reach the same group via more than one direct membership so
 Output is saved as a CSV in the current directory, e.g.:
 - `DuplicateMemberships_jsmith_20250515_143022.csv`
 - `DuplicateMemberships_Helpdesk_20250515_143022.csv`
+
+---
+
+### `find-groups-with-no-nesting-purpose.ps1`
+
+Identifies AD groups that play no role in any group nesting structure. Groups are classified into four categories so you can quickly decide what to investigate or clean up. Designed to handle large domains efficiently — all group and user data is loaded into memory up front, so the processing loop makes no individual AD calls and can scan 12,000+ groups in under a minute.
+
+**Features**
+- Classifies every group as Empty, EmptyNested, UsersOnly, or TopLevelContainer (see below)
+- Excludes built-in and well-known default AD groups by default (use `-IncludeBuiltin` to include them)
+- Accepts a specific OU subtree or runs against the entire domain
+- Colour-coded console output: red (Empty), yellow (EmptyNested), white (UsersOnly), grey (TopLevelContainer)
+- Summary on completion: counts per classification and total groups inspected
+
+**Classifications**
+
+| Classification | Meaning |
+|---|---|
+| `Empty` | Not nested anywhere and has no members — almost certainly safe to delete |
+| `EmptyNested` | Nested inside other group(s) but has no members — occupies a slot in the structure but contributes nothing |
+| `UsersOnly` | Not nested anywhere and only has user members — may be used for direct resource access (e.g. file shares) but plays no role in the AD nesting hierarchy |
+| `TopLevelContainer` | Not nested anywhere but contains sub-groups — this is the root of a nesting tree, which is often intentional |
+
+**Usage**
+
+```powershell
+# Interactive mode (prompts for scope)
+.\find-groups-with-no-nesting-purpose.ps1
+
+# Entire domain
+.\find-groups-with-no-nesting-purpose.ps1 -Scope Domain
+
+# Specific OU and all child OUs
+.\find-groups-with-no-nesting-purpose.ps1 -Scope OU -OUName "Helpdesk"
+
+# Include built-in and default system groups in results
+.\find-groups-with-no-nesting-purpose.ps1 -Scope Domain -IncludeBuiltin
+
+# With a custom output path
+.\find-groups-with-no-nesting-purpose.ps1 -Scope Domain -OutputPath "C:\Audit\orphaned_groups.csv"
+```
+
+**Output columns**
+
+| Column | Description |
+|---|---|
+| `GroupName` | Display name of the group |
+| `SamAccountName` | SamAccountName of the group |
+| `DistinguishedName` | Full DN of the group |
+| `Description` | Group description from AD |
+| `GroupScope` | `DomainLocal`, `Global`, or `Universal` |
+| `GroupCategory` | `Security` or `Distribution` |
+| `Classification` | One of the four classifications above |
+| `UserMembers` | Number of direct user members |
+| `GroupMembers` | Number of direct group members |
+| `OtherMembers` | Number of direct members that are neither users nor groups (e.g. computers) |
+| `TotalMembers` | Total direct member count |
+| `NestedInCount` | Number of groups this group is nested inside |
+| `NestedIn` | Pipe-separated list of parent group names |
+
+> **Note:** `UsersOnly` groups cannot be verified as unused by this script alone. A group with no nesting role may still be assigned to file share ACLs, GPO filtering, Exchange distribution, or other systems outside AD group objects. Always verify before deleting.
+
+Output is saved as a CSV in the current directory, e.g.:
+- `NoNestingPurpose_FullDomain_20250515_143022.csv`
+- `NoNestingPurpose_Helpdesk_20250515_143022.csv`
